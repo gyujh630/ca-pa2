@@ -309,24 +309,22 @@ static int process_instruction(unsigned int instr)
 		switch (funct)
 		{
 		case 0x08: // addi
-			immediate = instr & 0xFFFF;
+			printf(immediate);
 			if (immediate & 0x8000)
 				immediate |= 0xFFFF0000; // SignExtend
+			printf(immediate);
 			registers[rt] = registers[rs] + immediate;
 			break;
 
 		case 0x0c: // andi
-			immediate = instr & 0xFFFF;
 			registers[rt] = registers[rs] & immediate;
 			break;
 
 		case 0x0d: // ori
-			immediate = instr & 0xFFFF;
 			registers[rt] = registers[rs] | immediate;
 			break;
 
 		case 0x23: // lw
-			immediate = instr & 0xFFFF;
 			if (immediate & 0x8000)
 				immediate |= 0xFFFF0000; // SignExtend
 			int t = registers[rs] + immediate;
@@ -334,7 +332,6 @@ static int process_instruction(unsigned int instr)
 			break;
 
 		case 0x2b: // sw
-			immediate = instr & 0xFFFF;
 			if (immediate & 0x8000)
 				immediate |= 0xFFFF0000; // SignExtend
 			int target = registers[rs] + immediate;
@@ -406,6 +403,31 @@ static int process_instruction(unsigned int instr)
 
 static int load_program(char *const filename)
 {
+	FILE *file = fopen(filename, "r");
+	if (file == NULL)
+	{
+		perror("Error opening file");
+		return -1;
+	}
+	char line[256];
+	int line_number;
+	while (fgets(line, sizeof(line), file) != NULL)
+	{
+		line_number = strtoimax(line, NULL, 0);
+		for (int i = 0; i < 4; ++i)
+		{
+			memory[pc + i] = (line_number >> (8 * (3 - i))) & 0xFF; // 메모리에 할당
+		}
+		pc += 4;
+		printf("%d\n", line_number);
+	}
+	line_number = 0xffffffff; // halt
+	for (int i = 0; i < 4; ++i)
+	{
+		memory[pc + i] = (line_number >> (8 * (3 - i))) & 0xFF; // 메모리에 할당
+	}
+
+	fclose(file);
 	return -EINVAL;
 }
 
@@ -429,6 +451,17 @@ static int load_program(char *const filename)
 static int run_program(void)
 {
 	pc = INITIAL_PC;
+
+	while (1)
+	{
+		uint32_t instruction = *(uint32_t *)pc;
+		pc += 4;
+		int result = process_instruction(instruction);
+		if (result == 0)
+		{
+			break;
+		}
+	}
 
 	return 0;
 }
