@@ -232,11 +232,11 @@ static int process_instruction(unsigned int instr)
 	int shamt = (instr >> 6) & 0x1F;
 	int immediate = instr & 0x0000FFFF;
 	int address = instr & 0x03FFFFFF;
+
 	if (instr == 0xFFFFFFFF) // halt
 	{
 		return 0;
 	}
-	
 	if (opcode == 0) // r-format
 	{
 		switch (funct)
@@ -310,7 +310,7 @@ static int process_instruction(unsigned int instr)
 		{
 		case 0x08: // addi
 			if (immediate >= 0x00008000)
-				immediate += 0xffff0000;
+				immediate += 0xFFFF0000;
 			registers[rt] = registers[rs] + immediate;
 			break;
 
@@ -343,7 +343,6 @@ static int process_instruction(unsigned int instr)
 			rs = (instr >> 21) & 0x1F;
 			rt = (instr >> 16) & 0x1F;
 			rd = (instr >> 11) & 0x1F;
-
 			if (registers[rs] < registers[rt])
 				registers[rd] = 1;
 			else
@@ -352,20 +351,20 @@ static int process_instruction(unsigned int instr)
 
 		case 0x04: // beq
 			if (immediate >= 0x00008000)
-				immediate += 0xffff0000;
+				immediate += 0xFFFF0000;
 			if (registers[rs] == registers[rt])
 				pc += 4*immediate;
 			break;
 
 		case 0x05: // bne
 			if (immediate >= 0x00008000)
-				immediate += 0xffff0000; // SignExtImm
+				immediate += 0xFFFF0000;
 			if (registers[rs] != registers[rt])
 				pc += 4*immediate;
 			break;
 		}
 	}
-	return 0;
+	return 1;
 }
 
 /**********************************************************************
@@ -448,15 +447,15 @@ static int load_program(char *const filename)
 static int run_program(void)
 {
 	pc = INITIAL_PC;
-	int flag;
-	int instr;
+	int flag = 1; // flag 초기화
 
 	while (flag != 0)
 	{
-		instr = (memory[pc] << 24) + (memory[pc+1] << 16) + (memory[pc+2] << 8) + (memory[pc+3]);
+		int instr = (memory[pc] << 24) + (memory[pc+1] << 16) + (memory[pc+2] << 8) + (memory[pc+3]);
 		pc += 4;
 		flag = process_instruction(instr);
 	}
+
 	return 0;
 }
 
