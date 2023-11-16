@@ -309,10 +309,8 @@ static int process_instruction(unsigned int instr)
 		switch (funct)
 		{
 		case 0x08: // addi
-			printf(immediate);
 			if (immediate & 0x8000)
 				immediate |= 0xFFFF0000; // SignExtend
-			printf(immediate);
 			registers[rt] = registers[rs] + immediate;
 			break;
 
@@ -416,7 +414,7 @@ static int load_program(char *const filename)
 		line_number = strtoimax(line, NULL, 0);
 		for (int i = 0; i < 4; ++i)
 		{
-			memory[pc + i] = (line_number >> (8 * (3 - i))) & 0xFF; // 메모리에 할당
+			memory[pc+i] = (line_number >> (8*(3-i)))&0xFF; // 메모리에 할당
 		}
 		pc += 4;
 		printf("%d\n", line_number);
@@ -424,7 +422,7 @@ static int load_program(char *const filename)
 	line_number = 0xffffffff; // halt
 	for (int i = 0; i < 4; ++i)
 	{
-		memory[pc + i] = (line_number >> (8 * (3 - i))) & 0xFF; // 메모리에 할당
+		memory[pc+i] = (line_number >> (8*(3-i)))&0xFF; // 메모리에 할당
 	}
 
 	fclose(file);
@@ -451,18 +449,15 @@ static int load_program(char *const filename)
 static int run_program(void)
 {
 	pc = INITIAL_PC;
+	int flag;
+	int instr;
 
-	while (1)
+	while (flag != 0)
 	{
-		uint32_t instruction = *(uint32_t *)pc;
+		instr = (memory[pc] << 24) + (memory[pc+1] << 16) + (memory[pc+2] << 8) + (memory[pc+3]);
 		pc += 4;
-		int result = process_instruction(instruction);
-		if (result == 0)
-		{
-			break;
-		}
+		flag = process_instruction(instr);
 	}
-
 	return 0;
 }
 
