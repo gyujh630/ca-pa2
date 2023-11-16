@@ -230,13 +230,14 @@ static int process_instruction(unsigned int instr)
 	int rt = (instr >> 16) & 0x1F;
 	int rd = (instr >> 11) & 0x1F;
 	int shamt = (instr >> 6) & 0x1F;
-	short immediate = instr & 0xFFFF;
-	int address;
-	if (instr == 0xffffffff) // halt
+	int immediate = instr & 0x0000FFFF;
+	int address = instr & 0x03FFFFFF;
+	if (instr == 0xFFFFFFFF) // halt
 	{
 		return 0;
 	}
-	else if (opcode == 0) // r-format
+	
+	if (opcode == 0) // r-format
 	{
 		switch (funct)
 		{
@@ -268,8 +269,8 @@ static int process_instruction(unsigned int instr)
 			registers[rd] = registers[rt] >> shamt;
 			break;
 
-		case 0x03:											 // sra
-			if (registers[rt] < (1 << 31)) // 양수일때
+		case 0x03: // sra
+			if (registers[rt] < (1 << 31)) 
 				registers[rd] = registers[rt] >> shamt;
 			else
 			{
@@ -292,25 +293,24 @@ static int process_instruction(unsigned int instr)
 	}
 	else if (opcode == 0x02 || opcode == 0x03) // j-format
 	{
-		switch (funct)
-		{
-		case 0x02: // j
-			pc = (pc & 0xF0000000) | (address << 2);
-			break;
+		int top = pc & 0x10000000;
 
-		case 0x03: // jal
-			registers[31] = pc + 4;
-			pc = (pc & 0xF0000000) | (address << 2);
-			break;
+		if (opcode == 0x02){
+			pc = top + (address << 2);
+		}
+		else if (opcode == 0x03)
+		{ 
+			registers[31] = pc;
+			pc = top + (address << 2);
 		}
 	}
 	else // i-format
 	{
-		switch (funct)
+		switch (opcode)
 		{
 		case 0x08: // addi
-			if (immediate & 0x8000)
-				immediate |= 0xFFFF0000; // SignExtend
+			if (immediate >= 0x00008000)
+				immediate += 0xffff0000;
 			registers[rt] = registers[rs] + immediate;
 			break;
 
@@ -324,14 +324,14 @@ static int process_instruction(unsigned int instr)
 
 		case 0x23: // lw
 			if (immediate & 0x8000)
-				immediate |= 0xFFFF0000; // SignExtend
+				immediate |= 0xFFFF0000;
 			int t = registers[rs] + immediate;
-			registers[rt] = (memory[t] << 24) + (memory[t + 1] << 16) + (memory[t + 2] << 8) + memory[t + 3];
+			registers[rt] = (memory[t] << 24) + (memory[t+1] << 16) + (memory[t+2] << 8) + memory[t+3];
 			break;
 
 		case 0x2b: // sw
 			if (immediate & 0x8000)
-				immediate |= 0xFFFF0000; // SignExtend
+				immediate |= 0xFFFF0000;
 			int target = registers[rs] + immediate;
 			memory[target] = (registers[rt] >> 24) & 0xFF;
 			memory[target + 1] = (registers[rt] >> 16) & 0xFF;
@@ -351,17 +351,17 @@ static int process_instruction(unsigned int instr)
 			break;
 
 		case 0x04: // beq
-			if (immediate & 0x8000)
-				immediate |= 0xFFFF0000; // SignExtend
+			if (immediate >= 0x00008000)
+				immediate += 0xffff0000;
 			if (registers[rs] == registers[rt])
-				pc += immediate;
+				pc += 4*immediate;
 			break;
 
 		case 0x05: // bne
-			if (immediate & 0x8000)
-				immediate |= 0xFFFF0000; // SignExtend
+			if (immediate >= 0x00008000)
+				immediate += 0xffff0000; // SignExtImm
 			if (registers[rs] != registers[rt])
-				pc += immediate;
+				pc += 4*immediate;
 			break;
 		}
 	}
@@ -401,6 +401,7 @@ static int process_instruction(unsigned int instr)
 
 static int load_program(char *const filename)
 {
+	int line_number;
 	FILE *file = fopen(filename, "r");
 	if (file == NULL)
 	{
@@ -408,7 +409,6 @@ static int load_program(char *const filename)
 		return -1;
 	}
 	char line[256];
-	int line_number;
 	while (fgets(line, sizeof(line), file) != NULL)
 	{
 		line_number = strtoimax(line, NULL, 0);
@@ -417,7 +417,6 @@ static int load_program(char *const filename)
 			memory[pc+i] = (line_number >> (8*(3-i)))&0xFF; // 메모리에 할당
 		}
 		pc += 4;
-		printf("%d\n", line_number);
 	}
 	line_number = 0xffffffff; // halt
 	for (int i = 0; i < 4; ++i)
