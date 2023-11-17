@@ -323,30 +323,29 @@ static int process_instruction(unsigned int instr)
 			break;
 
 		case 0x23: // lw
-			if (immediate & 0x8000)
-				immediate |= 0xFFFF0000;
+			if (immediate >= 0x00008000)
+				immediate += 0xFFFF0000;
 			int t = registers[rs] + immediate;
-			registers[rt] = (memory[t] << 24) + (memory[t+1] << 16) + (memory[t+2] << 8) + memory[t+3];
+			registers[rt] = (memory[t] << 24) | (memory[t+1] << 16) | (memory[t+2] << 8) | memory[t+3];
 			break;
 
 		case 0x2b: // sw
-			if (immediate & 0x8000)
-				immediate |= 0xFFFF0000;
+			if (immediate >= 0x00008000)
+				immediate += 0xFFFF0000;
 			int target = registers[rs] + immediate;
-			memory[target] = (registers[rt] >> 24) & 0xFF;
-			memory[target + 1] = (registers[rt] >> 16) & 0xFF;
-			memory[target + 2] = (registers[rt] >> 8) & 0xFF;
-			memory[target + 3] = registers[rt] & 0xFF;
+			unsigned char *memory_ptr = (unsigned char *)&memory[target];
+			for (int i = 0; i < 4; ++i)
+			{
+				*memory_ptr = (registers[rt] >> (24 - 8 * i)) & 0xFF;
+				memory_ptr++;
+			}
 			break;
 
-		case 0x2a: // slt
-			rs = (instr >> 21) & 0x1F;
-			rt = (instr >> 16) & 0x1F;
-			rd = (instr >> 11) & 0x1F;
-			if (registers[rs] < registers[rt])
-				registers[rd] = 1;
-			else
-				registers[rd] = 0;
+		case 0x0a: // slti
+			if (immediate >= 0x00008000)
+				immediate += 0xFFFF0000;
+			registers[rt] = ((signed)registers[rs] < immediate) ? 1 : 0;
+			return 1;
 			break;
 
 		case 0x04: // beq
@@ -447,11 +446,11 @@ static int load_program(char *const filename)
 static int run_program(void)
 {
 	pc = INITIAL_PC;
-	int flag = 1; // flag 초기화
+	int flag = 1;
 
 	while (flag != 0)
 	{
-		int instr = (memory[pc] << 24) + (memory[pc+1] << 16) + (memory[pc+2] << 8) + (memory[pc+3]);
+		int instr = (memory[pc] << 24) | (memory[pc+1] << 16) | (memory[pc+2] << 8) | memory[pc+3];
 		pc += 4;
 		flag = process_instruction(instr);
 	}
